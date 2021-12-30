@@ -221,4 +221,56 @@ namespace EnvironmentMap
 
 		return result;
 	}
+
+	cv::Mat EnvironmentMapUtility::getDiffuseIrradianceMap(const cv::Mat& image, int sampleCount, Interpolation interpolation)
+	{
+		EnvironmentMapUtility::interpolation = interpolation;
+
+		cv::Mat result = cv::Mat_<cv::Vec3f>(128, 256);
+		if (!isValidEnvironmentMap(image))
+			return result;
+
+		cv::Mat environmentMap;
+		image.copyTo(environmentMap);
+		int imageType = environmentMap.type();
+		if (imageType == CV_8UC3)
+			environmentMap.convertTo(environmentMap, CV_32FC3, 1.0 / 255);
+
+		std::vector<float> samplesPhi(sampleCount, 0.f), samplesTheta(sampleCount, 0.f);
+		cv::RNG rng(0);
+		for (int i = 0; i < sampleCount; i++)
+		{
+			float u = rng.uniform(0.f, 1.f), v = rng.uniform(0.f, 1.f);
+			samplesPhi[i] = PI2 * u;
+			samplesTheta[i] = std::acos(2 * v - 1.f);
+		}
+
+		for (int x = 0; x < result.cols; x++)
+		{
+			float phi = PI2 * (x + 0.5f) / result.cols;
+			for (int y = 0; y < result.rows; y++)
+			{
+				float theta = PI * (y + 0.5f) / result.rows;
+				cv::Vec3f normal(-std::sin(theta) * std::sin(phi), std::cos(theta), std::sin(theta) * std::cos(phi));
+
+				cv::Vec3f value(0, 0, 0);
+				for (int i = 0; i < sampleCount; i++)
+				{
+					cv::Vec3f dir(-std::sin(samplesTheta[i]) * std::sin(samplesPhi[i]), std::cos(samplesTheta[i]), std::sin(samplesTheta[i]) * std::cos(samplesPhi[i]));
+					float H = normal.dot(dir);
+					if (H > 0.f)
+					{
+						value += (H * sampleDirection(environmentMap, samplesPhi[i], samplesTheta[i]));
+					}
+				}
+				result.at<cv::Vec3f>(y, x) = value;
+			}
+		}
+
+		result *= (4.f / sampleCount);
+		if (imageType == CV_8UC3)
+			result.convertTo(result, CV_8UC3, 255.0);
+
+		return result;
+	}
 }

@@ -104,6 +104,11 @@ namespace EnvironmentMap
 		/// 将环境贴图转换为6个面的cube map
 		/// </summary>
 		static std::map<std::string, cv::Mat> convertToCubeMap(const cv::Mat& image, Interpolation interpolation = Interpolation::Bilinear);
+
+		/// <summary>
+		/// 获取 diffuse 辐照度贴图, pixel(row, col) = (1/pi) * (4*pi/N) * sum[ I * max(dot(n, d), 0.0) ]
+		/// </summary>
+		static cv::Mat getDiffuseIrradianceMap(const cv::Mat& image, int sampleCount = 10000, Interpolation interpolation = Interpolation::Nearest);
 	};
 }
 
