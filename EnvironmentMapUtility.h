@@ -17,6 +17,7 @@ namespace EnvironmentMap
 		Nearest = 0,
 		Bilinear = 1,
 		Bicubic = 2,
+		Lanczos = 3,
 	};
 
 	class EnvironmentMapUtility
@@ -32,28 +33,31 @@ namespace EnvironmentMap
 		/// </summary>
 		const static cv::Vec3f dirBasis[6][3];
 
+		/// <summary>
+		/// 采样插值算法
+		/// </summary>
+		static Interpolation interpolation;
+
 	private:
 		/// <summary>
 		/// 把v截断在区间 [minv, maxv]
 		/// </summary>
-		/// <param name="v"></param>
-		/// <param name="minv"></param>
-		/// <param name="maxv"></param>
-		/// <returns></returns>
 		static float clamp(float v, float minv, float maxv);
 
 		/// <summary>
 		/// 返回正浮点数x所在的最小整数区间 [x0, x1]
 		/// </summary>
-		/// <param name="x"></param>
-		/// <param name="x0"></param>
-		/// <param name="x1"></param>
 		static void getIntegerInterval(float x, int& x0, int& x1);
 
 		/// <summary>
 		/// 双三次插值权值
 		/// </summary>
 		static float weightBicubic(float x, float a = -0.5f);
+
+		/// <summary>
+		/// Lanczos插值权值
+		/// </summary>
+		static float weightLanczos(float x, float a = 2.f);
 
 		/// <summary>
 		/// 从环境贴图上读取像素 (row, col), 可能为负值
@@ -76,6 +80,11 @@ namespace EnvironmentMap
 		static cv::Vec3f sampleBicubic(const cv::Mat& image, float row, float col);
 
 		/// <summary>
+		/// Lanczos插值采样非整数坐标
+		/// </summary>
+		static cv::Vec3f sampleLanczos(const cv::Mat& image, float row, float col);
+
+		/// <summary>
 		/// 从环境贴图插值采样纹理坐标(col, row) = (u, v)
 		/// </summary>
 		static cv::Vec3f sampleUV(const cv::Mat& image, float u, float v);
@@ -89,16 +98,12 @@ namespace EnvironmentMap
 		/// <summary>
 		/// 判断图像是否为有效的环境贴图
 		/// </summary>
-		/// <param name="image"></param>
-		/// <returns></returns>
 		static bool isValidEnvironmentMap(const cv::Mat& image);
 
 		/// <summary>
 		/// 将环境贴图转换为6个面的cube map
 		/// </summary>
-		/// <param name="image"></param>
-		/// <returns></returns>
-		static std::map<std::string, cv::Mat> convertToCubeMap(const cv::Mat& image);
+		static std::map<std::string, cv::Mat> convertToCubeMap(const cv::Mat& image, Interpolation interpolation = Interpolation::Bilinear);
 	};
 }
 

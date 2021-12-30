@@ -15,6 +15,8 @@ namespace EnvironmentMap
 		{cv::Vec3f(-1,0,0), cv::Vec3f(0,-1,0), cv::Vec3f(0,0,-1)},// -z
 	};
 
+	Interpolation EnvironmentMapUtility::interpolation = Interpolation::Bilinear;
+
 	float EnvironmentMapUtility::clamp(float v, float minv, float maxv)
 	{
 		if (minv > maxv)
@@ -28,13 +30,14 @@ namespace EnvironmentMap
 
 	void EnvironmentMapUtility::getIntegerInterval(float x, int& x0, int& x1)
 	{
-		int px = int(x);
-		if (x < px + 0.5f)
+		int px = int(std::floor(x));
+		float dx = x - px - 0.5f;
+		if (dx < 0.f)
 		{
 			x0 = px - 1;
 			x1 = px;
 		}
-		else if (x > px + 0.5f)
+		else if (dx > 0.f)
 		{
 			x0 = px;
 			x1 = px + 1;
@@ -57,6 +60,15 @@ namespace EnvironmentMap
 			return a * x3 - 5 * a * x2 + 8 * a * x - 4 * a;
 		else
 			return 0.f;
+	}
+
+	float EnvironmentMapUtility::weightLanczos(float x, float a)
+	{
+		if (std::fabs(x) < 1e-4f)
+			return 1.f;
+
+		float xpi = PI * x;
+		return a * std::sin(xpi) * std::sin(xpi / a) / (xpi * xpi);
 	}
 
 	cv::Vec3f EnvironmentMapUtility::samplePixel(const cv::Mat& image, int row, int col)
@@ -103,15 +115,37 @@ namespace EnvironmentMap
 
 	cv::Vec3f EnvironmentMapUtility::sampleBicubic(const cv::Mat& image, float row, float col)
 	{
+		int x0 = int(std::floor(col)), y0 = int(std::floor(row));
+
 		cv::Vec3f result(0, 0, 0);
-		int x = int(col), y = int(row);
 		for (int dx = -1; dx <= 2; dx++)
 		{
-			float wx = weightBicubic(x + dx - col);
+			int x = x0 + dx;
+			float wx = weightBicubic(x - col);
 			for (int dy = -1; dy <= 2; dy++)
 			{
-				float wy = weightBicubic(y + dy - row);
-				result += (wx * wy * samplePixel(image, y + dy, x + dx));
+				int y = y0 + dy;
+				float wy = weightBicubic(y - row);
+				result += (wx * wy * samplePixel(image, y, x));
+			}
+		}
+		return result;
+	}
+
+	cv::Vec3f EnvironmentMapUtility::sampleLanczos(const cv::Mat& image, float row, float col)
+	{
+		int x0 = int(std::floor(col)), y0 = int(std::floor(row));
+
+		cv::Vec3f result(0, 0, 0);
+		for (int dx = -4; dx <= 5; dx++)
+		{
+			int x = x0 + dx;
+			float wx = weightLanczos(x - col, 5);
+			for (int dy = -4; dy <= 5; dy++)
+			{
+				int y = y0 + dy;
+				float wy = weightLanczos(y - row, 5);
+				result += (wx * wy * samplePixel(image, y, x));
 			}
 		}
 		return result;
@@ -121,7 +155,18 @@ namespace EnvironmentMap
 	{
 		float col = u * image.cols;
 		float row = v * image.rows;
-		return sampleBicubic(image, row, col);
+
+		switch (interpolation)
+		{
+		case Interpolation::Nearest:
+			return sampleNearest(image, row, col);
+		case Interpolation::Bicubic:
+			return sampleBicubic(image, row, col);
+		case Interpolation::Lanczos:
+			return sampleLanczos(image, row, col);
+		default:
+			return sampleBilinear(image, row, col);
+		}
 	}
 
 	cv::Vec3f EnvironmentMapUtility::sampleDirection(const cv::Mat& image, float phi, float theta)
@@ -136,8 +181,10 @@ namespace EnvironmentMap
 		return (!image.empty()) && (image.cols == image.rows * 2);
 	}
 
-	std::map<std::string, cv::Mat> EnvironmentMapUtility::convertToCubeMap(const cv::Mat& image)
+	std::map<std::string, cv::Mat> EnvironmentMapUtility::convertToCubeMap(const cv::Mat& image, Interpolation interpolation)
 	{
+		EnvironmentMapUtility::interpolation = interpolation;
+
 		std::map<std::string, cv::Mat> result;
 		if (!isValidEnvironmentMap(image))
 			return result;
