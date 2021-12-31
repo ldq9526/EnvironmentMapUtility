@@ -17,7 +17,148 @@ namespace EnvironmentMap
 
 	Interpolation EnvironmentMapUtility::interpolation = Interpolation::Bilinear;
 
-	float EnvironmentMapUtility::clamp(float v, float minv, float maxv)
+	double basisSH00(const cv::Vec3d& d) {
+		// 0.5 * sqrt(1/pi)
+		return 0.282095;
+	}
+
+	double basisSH1n1(const cv::Vec3d& d) {
+		// -sqrt(3/(4pi)) * y
+		return -0.488603 * d[1];
+	}
+
+	double basisSH10(const cv::Vec3d& d) {
+		// sqrt(3/(4pi)) * z
+		return 0.488603 * d[2];
+	}
+
+	double basisSH1p1(const cv::Vec3d& d) {
+		// -sqrt(3/(4pi)) * x
+		return -0.488603 * d[0];
+	}
+
+	double basisSH2n2(const cv::Vec3d& d) {
+		// 0.5 * sqrt(15/pi) * x * y
+		return 1.092548 * d[0] * d[1];
+	}
+
+	double basisSH2n1(const cv::Vec3d& d) {
+		// -0.5 * sqrt(15/pi) * y * z
+		return -1.092548 * d[1] * d[2];
+	}
+
+	double basisSH20(const cv::Vec3d& d) {
+		// 0.25 * sqrt(5/pi) * (-x^2-y^2+2z^2)
+		return 0.315392 * (-d[0] * d[0] - d[1] * d[1] + 2.0 * d[2] * d[2]);
+	}
+
+	double basisSH2p1(const cv::Vec3d& d) {
+		// -0.5 * sqrt(15/pi) * x * z
+		return -1.092548 * d[0] * d[2];
+	}
+
+	double basisSH2p2(const cv::Vec3d& d) {
+		// 0.25 * sqrt(15/pi) * (x^2 - y^2)
+		return 0.546274 * (d[0] * d[0] - d[1] * d[1]);
+	}
+
+	double basisSH3n3(const cv::Vec3d& d) {
+		// -0.25 * sqrt(35/(2pi)) * y * (3x^2 - y^2)
+		return -0.590044 * d[1] * (3.0 * d[0] * d[0] - d[1] * d[1]);
+	}
+
+	double basisSH3n2(const cv::Vec3d& d) {
+		// 0.5 * sqrt(105/pi) * x * y * z
+		return 2.890611 * d[0] * d[1] * d[2];
+	}
+
+	double basisSH3n1(const cv::Vec3d& d) {
+		// -0.25 * sqrt(21/(2pi)) * y * (4z^2-x^2-y^2)
+		return -0.457046 * d[1] * (4.0 * d[2] * d[2] - d[0] * d[0]
+			- d[1] * d[1]);
+	}
+
+	double basisSH30(const cv::Vec3d& d) {
+		// 0.25 * sqrt(7/pi) * z * (2z^2 - 3x^2 - 3y^2)
+		return 0.373176 * d[2] * (2.0 * d[2] * d[2] - 3.0 * d[0] * d[0]
+			- 3.0 * d[1] * d[1]);
+	}
+
+	double basisSH3p1(const cv::Vec3d& d) {
+		// -0.25 * sqrt(21/(2pi)) * x * (4z^2-x^2-y^2)
+		return -0.457046 * d[0] * (4.0 * d[2] * d[2] - d[0] * d[0]
+			- d[1] * d[1]);
+	}
+
+	double basisSH3p2(const cv::Vec3d& d) {
+		// 0.25 * sqrt(105/pi) * z * (x^2 - y^2)
+		return 1.445306 * d[2] * (d[0] * d[0] - d[1] * d[1]);
+	}
+
+	double basisSH3p3(const cv::Vec3d& d) {
+		// -0.25 * sqrt(35/(2pi)) * x * (x^2-3y^2)
+		return -0.590044 * d[0] * (d[0] * d[0] - 3.0 * d[1] * d[1]);
+	}
+
+	double basisSH4n4(const cv::Vec3d& d) {
+		// 0.75 * sqrt(35/pi) * x * y * (x^2-y^2)
+		return 2.503343 * d[0] * d[1] * (d[0] * d[0] - d[1] * d[1]);
+	}
+
+	double basisSH4n3(const cv::Vec3d& d) {
+		// -0.75 * sqrt(35/(2pi)) * y * z * (3x^2-y^2)
+		return -1.770131 * d[1] * d[2] * (3.0 * d[0] * d[0] - d[1] * d[1]);
+	}
+
+	double basisSH4n2(const cv::Vec3d& d) {
+		// 0.75 * sqrt(5/pi) * x * y * (7z^2-1)
+		return 0.946175 * d[0] * d[1] * (7.0 * d[2] * d[2] - 1.0);
+	}
+
+	double basisSH4n1(const cv::Vec3d& d) {
+		// -0.75 * sqrt(5/(2pi)) * y * z * (7z^2-3)
+		return -0.669047 * d[1] * d[2] * (7.0 * d[2] * d[2] - 3.0);
+	}
+
+	double basisSH40(const cv::Vec3d& d) {
+		// 3/16 * sqrt(1/pi) * (35z^4-30z^2+3)
+		double z2 = d[2] * d[2];
+		return 0.105786 * (35.0 * z2 * z2 - 30.0 * z2 + 3.0);
+	}
+
+	double basisSH4p1(const cv::Vec3d& d) {
+		// -0.75 * sqrt(5/(2pi)) * x * z * (7z^2-3)
+		return -0.669047 * d[0] * d[2] * (7.0 * d[2] * d[2] - 3.0);
+	}
+
+	double basisSH4p2(const cv::Vec3d& d) {
+		// 3/8 * sqrt(5/pi) * (x^2 - y^2) * (7z^2 - 1)
+		return 0.473087 * (d[0] * d[0] - d[1] * d[1])
+			* (7.0 * d[2] * d[2] - 1.0);
+	}
+
+	double basisSH4p3(const cv::Vec3d& d) {
+		// -0.75 * sqrt(35/(2pi)) * x * z * (x^2 - 3y^2)
+		return -1.770131 * d[0] * d[2] * (d[0] * d[0] - 3.0 * d[1] * d[1]);
+	}
+
+	double basisSH4p4(const cv::Vec3d& d) {
+		// 3/16*sqrt(35/pi) * (x^2 * (x^2 - 3y^2) - y^2 * (3x^2 - y^2))
+		double x2 = d[0] * d[0];
+		double y2 = d[1] * d[1];
+		return 0.625836 * (x2 * (x2 - 3.0 * y2) - y2 * (3.0 * x2 - y2));
+	}
+
+	std::function<double(const cv::Vec3d&)> EnvironmentMapUtility::SHB[25] = {
+		basisSH00,
+		basisSH1n1,basisSH10,basisSH1p1,
+		basisSH2n2,basisSH2n1,basisSH20,basisSH2p1,basisSH2p2,
+		basisSH3n3,basisSH3n2,basisSH3n1,basisSH30,basisSH3p1,basisSH3p2,basisSH3p3,
+		basisSH4n4,basisSH4n3,basisSH4n2,basisSH4n1,basisSH40,basisSH4p1,basisSH4p2,basisSH4p3,basisSH4p4
+	};
+
+	template <typename T>
+	T EnvironmentMapUtility::clamp(T v, T minv, T maxv)
 	{
 		if (minv > maxv)
 			std::swap(minv, maxv);
@@ -94,7 +235,7 @@ namespace EnvironmentMap
 
 	cv::Vec3f EnvironmentMapUtility::sampleNearest(const cv::Mat& image, float row, float col)
 	{
-		return image.at<cv::Vec3f>(int(row), int(col));
+		return image.at<cv::Vec3f>(clamp(int(row), 0, image.rows - 1), clamp(int(col), 0, image.cols - 1));
 	}
 
 	cv::Vec3f EnvironmentMapUtility::sampleBilinear(const cv::Mat& image, float row, float col)
@@ -259,9 +400,7 @@ namespace EnvironmentMap
 					cv::Vec3f dir(-std::sin(samplesTheta[i]) * std::sin(samplesPhi[i]), std::cos(samplesTheta[i]), std::sin(samplesTheta[i]) * std::cos(samplesPhi[i]));
 					float H = normal.dot(dir);
 					if (H > 0.f)
-					{
 						value += (H * sampleDirection(environmentMap, samplesPhi[i], samplesTheta[i]));
-					}
 				}
 				result.at<cv::Vec3f>(y, x) = value;
 			}
@@ -270,6 +409,112 @@ namespace EnvironmentMap
 		result *= (4.f / sampleCount);
 		if (imageType == CV_8UC3)
 			result.convertTo(result, CV_8UC3, 255.0);
+
+		return result;
+	}
+
+
+	std::unique_ptr<std::vector<cv::Vec3d> > EnvironmentMapUtility::getCoefficientsSH(const cv::Mat& image, int order)
+	{
+		if (order < 0 || order > 4)
+			order = 2;
+
+		int coeffCount = (order + 1) * (order + 1);
+		cv::Vec3d zero(0, 0, 0);
+		std::unique_ptr<std::vector<cv::Vec3d> > coeffSH(new std::vector<cv::Vec3d>(coeffCount, zero));
+
+		if (!isValidEnvironmentMap(image))
+			return coeffSH;
+
+		cv::Mat environmentMap;
+		image.copyTo(environmentMap);
+		int imageType = environmentMap.type();
+		if (imageType == CV_8UC3)
+			environmentMap.convertTo(environmentMap, CV_32FC3, 1.0 / 255);
+
+		float pixelArea = (PI * PI2 / (image.cols * image.rows));
+		for (int y = 0; y < image.rows; y++)
+		{
+			float theta = PI * (y + 0.5f) / image.rows;
+			double r = std::sin(theta);
+			double weight = r * pixelArea;
+			for (int x = 0; x < image.cols; x++)
+			{
+				float phi = PI2 * (x + 0.5f) / image.cols;
+				cv::Vec3f color = environmentMap.at<cv::Vec3f>(y, x);
+
+				cv::Vec3d dir(-r * std::sin(phi), std::cos(theta), r * cos(phi));
+				for (int k = 0; k < coeffCount; k++)
+					(*coeffSH)[k] += (weight * SHB[k](dir) * color);
+			}
+		}
+
+		return coeffSH;
+	}
+
+	std::unique_ptr<std::vector<cv::Vec3d> > EnvironmentMapUtility::uniformSampleCoefficientsSH(const cv::Mat& image, int order, int sampleCount, Interpolation interpolation)
+	{
+		EnvironmentMapUtility::interpolation = interpolation;
+
+		if (order < 0 || order > 4)
+			order = 2;
+
+		int coeffCount = (order + 1) * (order + 1);
+		cv::Vec3d zero(0, 0, 0);
+		std::unique_ptr<std::vector<cv::Vec3d> > coeffSH(new std::vector<cv::Vec3d>(coeffCount, zero));
+
+		if (!isValidEnvironmentMap(image))
+			return coeffSH;
+
+		cv::Mat environmentMap;
+		image.copyTo(environmentMap);
+		int imageType = environmentMap.type();
+		if (imageType == CV_8UC3)
+			environmentMap.convertTo(environmentMap, CV_32FC3, 1.0 / 255);
+
+		cv::RNG rng(0);
+		for (int i = 0; i < sampleCount; i++)
+		{
+			float phi = PI2 * rng.uniform(0.f, 1.f);
+			float theta = std::acos(2 * rng.uniform(0.f, 1.f) - 1);
+			double r = std::sin(theta);
+			cv::Vec3d dir(-r * std::sin(phi), std::cos(theta), r * cos(phi));
+
+			for (int k = 0; k < coeffCount; k++)
+				(*coeffSH)[k] += (SHB[k](dir) * sampleDirection(environmentMap, phi, theta));
+		}
+
+		double weight = PI4 / sampleCount;
+		for (int k = 0; k < coeffCount; k++)
+			(*coeffSH)[k] *= weight;
+
+		return coeffSH;
+	}
+
+	cv::Mat EnvironmentMapUtility::getEnvironmentMapFromSH(const std::unique_ptr<std::vector<cv::Vec3d> >& coeffSH, int order)
+	{
+		cv::Mat result = cv::Mat_<cv::Vec3d>::zeros(256, 512);
+
+		if (coeffSH == nullptr)
+			return result;
+
+		if (order < 0 || order > 4)
+			order = 2;
+
+		int coeffCount = std::min(int(coeffSH->size()), (order + 1) * (order + 1));
+		for (int x = 0; x < result.cols; x++)
+		{
+			double phi = PI2 * (x + 0.5) / result.cols;
+			for (int y = 0; y < result.rows; y++)
+			{
+				double theta = PI * (y + 0.5) / result.rows;
+				double r = std::sin(theta);
+				cv::Vec3d dir(-r * std::sin(phi), std::cos(theta), r * cos(phi));
+
+				for (int k = 0; k < coeffCount; k++)
+					result.at<cv::Vec3d>(y, x) += (SHB[k](dir) * (*coeffSH)[k]);
+			}
+		}
 
 		return result;
 	}

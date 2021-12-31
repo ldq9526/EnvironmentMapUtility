@@ -3,7 +3,10 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <array>
+#include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace EnvironmentMap
@@ -38,11 +41,17 @@ namespace EnvironmentMap
 		/// </summary>
 		static Interpolation interpolation;
 
+		/// <summary>
+		/// 前3阶球谐基函数
+		/// </summary>
+		static std::function<double(const cv::Vec3d&)> SHB[25];
+
 	private:
 		/// <summary>
 		/// 把v截断在区间 [minv, maxv]
 		/// </summary>
-		static float clamp(float v, float minv, float maxv);
+		template <typename T>
+		static T clamp(T v, T minv, T maxv);
 
 		/// <summary>
 		/// 返回正浮点数x所在的最小整数区间 [x0, x1]
@@ -109,6 +118,21 @@ namespace EnvironmentMap
 		/// 获取 diffuse 辐照度贴图, pixel(row, col) = (1/pi) * (4*pi/N) * sum[ I * max(dot(n, d), 0.0) ]
 		/// </summary>
 		static cv::Mat getDiffuseIrradianceMap(const cv::Mat& image, int sampleCount = 10000, Interpolation interpolation = Interpolation::Nearest);
+
+		/// <summary>
+		/// 通过计算每个像素的立体角获取球谐系数
+		/// </summary>
+		static std::unique_ptr<std::vector<cv::Vec3d> > getCoefficientsSH(const cv::Mat& image, int order);
+
+		/// <summary>
+		/// 通过球面均匀采样获取球谐系数
+		/// </summary>
+		static std::unique_ptr<std::vector<cv::Vec3d> > uniformSampleCoefficientsSH(const cv::Mat& image, int order, int sampleCount = 10000, Interpolation interpolation = Interpolation::Nearest);
+
+		/// <summary>
+		/// 从球谐系数可视化环境贴图
+		/// </summary>
+		static cv::Mat getEnvironmentMapFromSH(const std::unique_ptr<std::vector<cv::Vec3d> >& coeffSH, int order);
 	};
 }
 
