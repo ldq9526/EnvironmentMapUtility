@@ -375,7 +375,10 @@ namespace EnvironmentMap
 		image.copyTo(environmentMap);
 		int imageType = environmentMap.type();
 		if (imageType == CV_8UC3)
+		{
 			environmentMap.convertTo(environmentMap, CV_32FC3, 1.0 / 255);
+			cv::pow(environmentMap, 2.2, environmentMap);
+		}
 
 		std::vector<float> samplesPhi(sampleCount, 0.f), samplesTheta(sampleCount, 0.f);
 		cv::RNG rng(0);
@@ -408,7 +411,10 @@ namespace EnvironmentMap
 
 		result *= (4.f / sampleCount);
 		if (imageType == CV_8UC3)
+		{
+			cv::pow(result, 1.0 / 2.2, result);
 			result.convertTo(result, CV_8UC3, 255.0);
+		}
 
 		return result;
 	}
