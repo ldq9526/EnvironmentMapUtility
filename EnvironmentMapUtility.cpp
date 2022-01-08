@@ -402,14 +402,28 @@ namespace EnvironmentMap
 				{
 					cv::Vec3f dir(-std::sin(samplesTheta[i]) * std::sin(samplesPhi[i]), std::cos(samplesTheta[i]), std::sin(samplesTheta[i]) * std::cos(samplesPhi[i]));
 					float H = normal.dot(dir);
+					cv::Vec3f sample(0, 0, 0);
 					if (H > 0.f)
-						value += (H * sampleDirection(environmentMap, samplesPhi[i], samplesTheta[i]));
+					{
+						sample = sampleDirection(environmentMap, samplesPhi[i], samplesTheta[i]);
+					}
+					else if (H < 0.f)
+					{
+						H = 0.f - H;
+						if(samplesPhi[i] < PI)
+							sample = sampleDirection(environmentMap, samplesPhi[i] + PI, PI - samplesTheta[i]);
+						else if(samplesPhi[i] < PI)
+							sample = sampleDirection(environmentMap, samplesPhi[i] - PI, PI - samplesTheta[i]);
+						else
+							sample = sampleDirection(environmentMap, 0.f, PI - samplesTheta[i]);
+					}
+					value += (H * sample);
 				}
 				result.at<cv::Vec3f>(y, x) = value;
 			}
 		}
 
-		result *= (4.f / sampleCount);
+		result *= (2.f / sampleCount);
 		if (imageType == CV_8UC3)
 		{
 			cv::pow(result, 1.0 / 2.2, result);
